@@ -15,7 +15,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // MongoDB Connection
-mongoose.connect("mongodb+srv://tqb_db:qm2jSowGKXqpot1T@cluster0.kvrp1ht.mongodb.net/tqb_db?retryWrites=true&w=majority&appName=Cluster0", {
+mongoose.connect(process.env.MONGODB_CONNECT_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
