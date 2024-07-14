@@ -1,5 +1,3 @@
-// Product.js
-
 const express = require("express");
 const multer = require('multer');
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
@@ -23,12 +21,11 @@ router.post("/admin/add-products", upload.single('image'), async (req, res) => {
   try {
     console.log('Incoming request data:', req.body);
 
-    
-
     const imageName = req.file ? req.file.path : 'new.jpeg';
-    const { category, productName, price, weight, flavour , type } = req.body;
+    const publicId = req.file ? req.file.filename : '';
+    const { category, productName, price, weight, flavour, type } = req.body;
     const image = imageName;
-    const newProduct = new ProductsModel({ image, category, productName, price, weight, flavour , type });
+    const newProduct = new ProductsModel({ image, publicId, category, productName, price, weight, flavour, type });
     await newProduct.save();
     res.status(201).json(newProduct);
   } catch (err) {
@@ -38,47 +35,48 @@ router.post("/admin/add-products", upload.single('image'), async (req, res) => {
 });
 
 router.get("/products", async (req, res) => {
-    try {
-      const products = await ProductsModel.find();
-      res.status(200).json(products);
-    } catch (err) {
-      console.error(err.message);
-      res.status(500).json({ error: 'Server error' });
+  try {
+    const products = await ProductsModel.find();
+    res.status(200).json(products);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.get("/product/:id", async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const product = await ProductsModel.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: "Product Not Found" });
     }
-  });
+    res.status(200).json(product);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
-  router.get("/product/:id" , async(req , res)=>{
-    try {
-      const productId = req.params.id;
-      const product  = await ProductsModel.findById(productId);
-      if(!product)
-        {
-          return res.status(404).json({error: "Product Not Found "});
-
-        }
-        res.status(200).json(product);
-
-      
-    } catch (error) {
-      res.status(500).json({error:error.message});
+router.delete("/product/:id", async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const product = await ProductsModel.findById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
     }
-  })
 
-  router.delete("/product/:id", async (req,res)=>{
-try {
-  const productId = req.params.id;
-  const deleteProduct = await ProductsModel.findByIdAndDelete(productId);
-  if(!deleteProduct)
-    {
-      return res.status(404).json({error :'Product not Found'});
-    }
-    res.status(200).json({message:'product Deleted Successfully',deleteProduct});
-} catch (error) {
-    res.status(500).json({error:error.message})
-} });
+    // Delete image from Cloudinary
+    await cloudinary.uploader.destroy(product.publicId);
 
+    // Delete product from database
+    await ProductsModel.findByIdAndDelete(productId);
+    res.status(200).json({ message: 'Product and image deleted successfully', product });
+  } catch (error) {
+    res.status(500).json({ error: 'Server error', message: error.message });
+  }
+});
 
-router.put("/product/:id", upload.single('image'), async(req,res)=>{
+router.put("/product/:id", upload.single('image'), async (req, res) => {
   try {
     const productId = req.params.id;
     const updateData = {
@@ -90,31 +88,28 @@ router.put("/product/:id", upload.single('image'), async(req,res)=>{
       type: req.body.type
     };
 
-     // Check if a new image is uploaded
-     if (req.file) {
+    // Check if a new image is uploaded
+    if (req.file) {
+      // Delete the old image from Cloudinary
+      await cloudinary.uploader.destroy(req.body.publicId);
+
       updateData.image = req.file.path; // Update image path if a new image is uploaded
+      updateData.publicId = req.file.filename; // Update publicId if a new image is uploaded
     }
 
+    const existingProduct = await ProductsModel.findById(productId);
+    console.log(existingProduct);
+    if (!existingProduct) {
+      return res.status(404).json({ error: "Product Not Found" });
+    }
 
-     const existingProduct = await ProductsModel.findById(productId);
-     console.log(existingProduct);
-     if(!existingProduct)
-      {
-         return res.status(404).json({error:"Product Not Found"});
-
-      }
-    
-      const updatedProduct = await ProductsModel.findByIdAndUpdate(productId , updateData,{new:true});
-      console.log("upadted Product : ", updatedProduct);
-       res.status(200).json({message: 'Product Updated Successfully', updatedProduct});
-
-
-    
+    const updatedProduct = await ProductsModel.findByIdAndUpdate(productId, updateData, { new: true });
+    console.log("Updated Product: ", updatedProduct);
+    res.status(200).json({ message: 'Product Updated Successfully', updatedProduct });
   } catch (error) {
     console.log("500 error ");
-    res.status(500).json({error:error.message});
-    
+    res.status(500).json({ error: error.message });
   }
-})
+});
 
 module.exports = router;
